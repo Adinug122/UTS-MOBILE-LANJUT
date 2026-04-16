@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,8 +42,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,85 +57,71 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.unscramble.AppDatabase
 import com.example.unscramble.R
+import com.example.unscramble.Words
 import com.example.unscramble.ui.theme.UnscrambleTheme
+import kotlinx.coroutines.launch
 
 @Composable
-fun GameScreen(gameViewModel: GameViewModel = viewModel()) {
-    val gameUiState by gameViewModel.uiState.collectAsState()
-    val mediumPadding = dimensionResource(R.dimen.padding_medium)
-
+fun GameScreen(db: AppDatabase) {
+    var text by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val words = remember { mutableStateListOf<Words>() }
+    LaunchedEffect(Unit) {
+        val data = db.WordsDao().getAllWords()
+        words.clear()
+        words.addAll(data)
+    }
     Column(
         modifier = Modifier
             .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
             .safeDrawingPadding()
-            .padding(mediumPadding),
-        verticalArrangement = Arrangement.Center,
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         Text(
-            text = stringResource(R.string.app_name),
-            style = typography.titleLarge,
+            text = "Input Kata",
+            style = typography.titleLarge
         )
-        GameLayout(
-            onUserGuessChanged = { gameViewModel.updateUserGuess(it) },
-            wordCount = gameUiState.currentWordCount,
-            userGuess = gameViewModel.userGuess,
-            onKeyboardDone = { gameViewModel.checkUserGuess() },
-            currentScrambledWord = gameUiState.currentScrambledWord,
-            isGuessWrong = gameUiState.isGuessedWordWrong,
+
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("Masukkan kata") },
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight()
-                .padding(mediumPadding)
+                .padding(top = 16.dp)
         )
-        Column(
+
+        Button(
+            onClick = {
+                scope.launch {
+                    if (text.isNotEmpty()) {
+                        val newWord = Words(kata = text)
+                        db.WordsDao().insert(newWord)
+                        words.add(newWord)
+                        text = ""
+                    }
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(mediumPadding),
-            verticalArrangement = Arrangement.spacedBy(mediumPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(top = 8.dp)
         ) {
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { gameViewModel.checkUserGuess() }
-            ) {
-                Text(
-                    text = stringResource(R.string.submit),
-                    fontSize = 16.sp
-                )
-            }
-
-            OutlinedButton(
-                onClick = { gameViewModel.skipWord() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = stringResource(R.string.skip),
-                    fontSize = 16.sp
-                )
-            }
+            Text("Simpan Kata")
         }
 
-        GameStatus(score = gameUiState.score, modifier = Modifier.padding(20.dp))
-
-        if (gameUiState.isGameOver) {
-            FinalScoreDialog(
-                score = gameUiState.score,
-                onPlayAgain = { gameViewModel.resetGame() }
-            )
-        }
     }
-}
 
+}
 @Composable
 fun GameStatus(score: Int, modifier: Modifier = Modifier) {
     Card(
@@ -250,10 +243,12 @@ private fun FinalScoreDialog(
     )
 }
 
+
+
 @Preview(showBackground = true)
 @Composable
 fun GameScreenPreview() {
     UnscrambleTheme {
-        GameScreen()
+
     }
 }
