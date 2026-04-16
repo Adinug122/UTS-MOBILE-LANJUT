@@ -10,7 +10,7 @@ data class Words(
     @field:SerializedName("kata")
     val kata: String? = null,
 
-    @PrimaryKey
+    @PrimaryKey(autoGenerate = true)
     @field:SerializedName("index")
-    val index: Int? = null
+    val index: Int = 0
 )
